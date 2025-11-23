@@ -1,0 +1,5 @@
+covid_dashboard/
+├── app.py
+├── requirements.txt
+├── covid_integrated_predictions.csv
+└── README.md
