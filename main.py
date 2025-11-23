@@ -118,7 +118,7 @@ class COVIDDashboard:
         # Color mapping based on selection
         if map_type == "True Infection Rates":
             values = self.data['true_infection_rate']
-            cmap = 'RdYlGn_r'  # Red for high, green for low
+            cmap = 'RdYlGn_r'
             legend_name = "True Infection Rate (%)"
         elif map_type == "Predicted Infection Rates":
             values = self.data['predicted_infection_rate']
@@ -126,7 +126,7 @@ class COVIDDashboard:
             legend_name = "Predicted Infection Rate (%)"
         else:
             values = self.data['prediction_error']
-            cmap = 'RdBu_r'  # Red for overestimation, blue for underestimation
+            cmap = 'RdBu_r'
             legend_name = "Prediction Error (%)"
         
         # Normalize values for color mapping
@@ -137,13 +137,14 @@ class COVIDDashboard:
                 # For error, use diverging colormap
                 error = row['prediction_error']
                 if error > 0:
-                    color = f"#{int(255*(error/vmax)):02x}0000"  # Red scale
+                    color = f"#{min(255, int(255*(error/vmax))):02x}0000"  # Red scale
                 else:
-                    color = f"#0000{int(255*(abs(error)/abs(vmin))):02x}"  # Blue scale
+                    color = f"#0000{min(255, int(255*(abs(error)/abs(vmin))):02x}"  # Blue scale
             else:
                 # For rates, use sequential colormap
-                norm_value = (row[map_type.split()[0].lower() + '_infection_rate'] - vmin) / (vmax - vmin)
-                color = f"#{int(255*norm_value):02x}{int(255*(1-norm_value)):02x}00"  # Green to red
+                rate_value = row['true_infection_rate'] if map_type == "True Infection Rates" else row['predicted_infection_rate']
+                norm_value = (rate_value - vmin) / (vmax - vmin)
+                color = f"#{int(255*norm_value):02x}{int(255*(1-norm_value)):02x}00"
             
             # Add circle marker
             folium.CircleMarker(
@@ -183,8 +184,8 @@ class COVIDDashboard:
                     'true_infection_rate': 'True Infection Rate (%)',
                     'predicted_infection_rate': 'Predicted Infection Rate (%)',
                     'data_type': 'Data Quality'
-                },
-                trendline='lowess'
+                }
+                # Removed trendline parameter
             )
             # Add perfect prediction line
             max_rate = max(self.data['true_infection_rate'].max(), 
@@ -229,7 +230,7 @@ class COVIDDashboard:
                                    ['true_infection_rate', 'predicted_infection_rate', 'prediction_error'], 
                                    key="y_feature")
         
-        # Create scatter plot
+        # Create scatter plot without trendline
         fig = px.scatter(
             self.data,
             x=x_feature,
@@ -237,8 +238,8 @@ class COVIDDashboard:
             color='data_type',
             size='population_density',
             hover_data=['area_id'],
-            title=f'{y_feature.replace("_", " ").title()} vs {x_feature.replace("_", " ").title()}',
-            trendline='lowess'
+            title=f'{y_feature.replace("_", " ").title()} vs {x_feature.replace("_", " ").title()}'
+            # Removed trendline parameter
         )
         st.plotly_chart(fig, use_container_width=True)
     
@@ -260,8 +261,8 @@ class COVIDDashboard:
                 labels={
                     'income_level': 'Income Level ($)',
                     'prediction_error': 'Prediction Error (%)'
-                },
-                trendline='lowess'
+                }
+                # Removed trendline parameter
             )
             fig.add_hline(y=0, line_dash="dash", line_color="red")
             st.plotly_chart(fig, use_container_width=True)
@@ -277,8 +278,8 @@ class COVIDDashboard:
                 labels={
                     'urban_proximity': 'Urban Proximity (0-1)',
                     'prediction_error': 'Prediction Error (%)'
-                },
-                trendline='lowess'
+                }
+                # Removed trendline parameter
             )
             fig.add_hline(y=0, line_dash="dash", line_color="red")
             st.plotly_chart(fig, use_container_width=True)
@@ -288,13 +289,11 @@ class COVIDDashboard:
         st.markdown('<div class="section-header">Uncertainty Analysis</div>', 
                    unsafe_allow_html=True)
         
-        # Calculate uncertainty metrics
         self.data['uncertainty_level'] = self.data['prediction_abs_error'] / self.data['true_infection_rate']
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # Uncertainty by data quality
             fig = px.box(
                 self.data,
                 x='data_type',
@@ -308,7 +307,6 @@ class COVIDDashboard:
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            # High uncertainty areas
             high_uncertainty = self.data.nlargest(10, 'prediction_abs_error')
             fig = px.bar(
                 high_uncertainty,
@@ -329,7 +327,6 @@ class COVIDDashboard:
         st.markdown('<div class="section-header">Detailed Performance Metrics</div>', 
                    unsafe_allow_html=True)
         
-        # Calculate metrics by data quality
         metrics_by_quality = []
         for quality in self.data['data_type'].unique():
             subset = self.data[self.data['data_type'] == quality]
@@ -352,7 +349,6 @@ class COVIDDashboard:
             st.dataframe(metrics_df.round(3), use_container_width=True)
         
         with col2:
-            # Error distribution by data quality
             fig = px.violin(
                 self.data,
                 x='data_type',
@@ -368,14 +364,11 @@ class COVIDDashboard:
     
     def run_dashboard(self):
         """Run the complete dashboard"""
-        # Header
         st.markdown('<h1 class="main-header">🦠 COVID-19 Spread Prediction Dashboard</h1>', 
                    unsafe_allow_html=True)
         
-        # Overview metrics
         self.create_overview_metrics()
         
-        # Main content
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "🌍 Spatial Analysis", 
             "📊 Performance", 
@@ -400,7 +393,6 @@ class COVIDDashboard:
         with tab5:
             self.create_comparison_metrics()
         
-        # Footer
         st.markdown("---")
         st.markdown("""
         <div style='text-align: center; color: gray;'>
@@ -410,7 +402,6 @@ class COVIDDashboard:
         """, unsafe_allow_html=True)
 
 def main():
-    # Initialize dashboard
     try:
         dashboard = COVIDDashboard('covid_integrated_predictions.csv')
         dashboard.run_dashboard()
